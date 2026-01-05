@@ -1,7 +1,11 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../state/AuthContext";
+
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim());
+}
 
 // PUBLIC_INTERFACE
 export default function LoginPage() {
@@ -11,18 +15,43 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+
+  const canSubmit = useMemo(() => {
+    if (!supabaseConfigured) return false;
+    const e = email.trim();
+    const p = password;
+    return isValidEmail(e) && p.length >= 6;
+  }, [email, password, supabaseConfigured]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!supabaseConfigured) {
+      setError("Supabase is not configured.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
     setWorking(true);
     try {
-      await signIn({ email, password });
-      navigate("/");
+      await signIn({ email: email.trim(), password });
+      // AuthContext session will update via onAuthStateChange; navigate immediately for UX.
+      navigate("/", { replace: true });
     } catch (err) {
-      setError(err?.message || "Login failed.");
+      // Supabase errors often include useful messages; normalize common ones.
+      const msg = String(err?.message || "Login failed.");
+      setError(msg);
     } finally {
       setWorking(false);
     }
@@ -31,7 +60,7 @@ export default function LoginPage() {
   return (
     <PageShell title="Login" subtitle="Sign in to track your orders across devices.">
       <div className="authWrap">
-        <form className="card authCard" onSubmit={onSubmit}>
+        <form className="card authCard" onSubmit={onSubmit} noValidate>
           {!supabaseConfigured ? (
             <div className="errorBox">
               Supabase is not configured. Add <code>REACT_APP_SUPABASE_URL</code> and{" "}
@@ -47,12 +76,17 @@ export default function LoginPage() {
               id="email"
               className="input"
               type="email"
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               required
               disabled={!supabaseConfigured || working}
+              aria-invalid={email.trim().length > 0 && !isValidEmail(email) ? "true" : "false"}
             />
+            {email.trim().length > 0 && !isValidEmail(email) ? (
+              <div className="muted small">Enter a valid email like name@example.com.</div>
+            ) : null}
           </div>
 
           <div>
@@ -69,11 +103,16 @@ export default function LoginPage() {
               required
               disabled={!supabaseConfigured || working}
             />
+            <div className="muted small">Minimum 6 characters.</div>
           </div>
 
-          {error ? <div className="errorBox">{error}</div> : null}
+          {error ? <div className="errorBox" role="alert">{error}</div> : null}
 
-          <button className="btn btn-primary btn-block" type="submit" disabled={!supabaseConfigured || working}>
+          <button
+            className={`btn btn-primary btn-block ${!canSubmit || working ? "is-disabled" : ""}`}
+            type="submit"
+            disabled={!canSubmit || working}
+          >
             {working ? "Signing in…" : "Sign in"}
           </button>
 

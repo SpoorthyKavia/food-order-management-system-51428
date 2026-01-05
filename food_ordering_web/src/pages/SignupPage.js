@@ -1,29 +1,65 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../state/AuthContext";
+
+function isValidEmail(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim());
+}
 
 // PUBLIC_INTERFACE
 export default function SignupPage() {
   /** Signup page using Supabase email/password. */
-  const { signUp, supabaseConfigured } = useAuth();
+  const { signUp, supabaseConfigured, user } = useAuth();
+  const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const canSubmit = useMemo(() => {
+    if (!supabaseConfigured) return false;
+    const e = email.trim();
+    return isValidEmail(e) && password.length >= 6;
+  }, [email, password, supabaseConfigured]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!supabaseConfigured) {
+      setError("Supabase is not configured.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
     setWorking(true);
     try {
-      await signUp({ email, password });
-      setSuccess("Account created. Check your email for a confirmation link (if enabled).");
+      await signUp({ email: email.trim(), password });
+
+      // If email confirmation is disabled, Supabase may immediately create a session.
+      // AuthContext will update `user` asynchronously; we optimistically navigate if it already exists.
+      if (user) {
+        navigate("/", { replace: true });
+        return;
+      }
+
+      setSuccess(
+        "Account created. If email confirmation is enabled, check your inbox for a confirmation link."
+      );
     } catch (err) {
-      setError(err?.message || "Signup failed.");
+      setError(String(err?.message || "Signup failed."));
     } finally {
       setWorking(false);
     }
@@ -32,7 +68,7 @@ export default function SignupPage() {
   return (
     <PageShell title="Sign up" subtitle="Create an account to make checkout faster and track orders.">
       <div className="authWrap">
-        <form className="card authCard" onSubmit={onSubmit}>
+        <form className="card authCard" onSubmit={onSubmit} noValidate>
           {!supabaseConfigured ? (
             <div className="errorBox">
               Supabase is not configured. Add <code>REACT_APP_SUPABASE_URL</code> and{" "}
@@ -48,12 +84,17 @@ export default function SignupPage() {
               id="email"
               className="input"
               type="email"
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               required
               disabled={!supabaseConfigured || working}
+              aria-invalid={email.trim().length > 0 && !isValidEmail(email) ? "true" : "false"}
             />
+            {email.trim().length > 0 && !isValidEmail(email) ? (
+              <div className="muted small">Enter a valid email like name@example.com.</div>
+            ) : null}
           </div>
 
           <div>
@@ -73,10 +114,14 @@ export default function SignupPage() {
             <div className="muted small">Use at least 6 characters.</div>
           </div>
 
-          {error ? <div className="errorBox">{error}</div> : null}
+          {error ? <div className="errorBox" role="alert">{error}</div> : null}
           {success ? <div className="successBox">{success}</div> : null}
 
-          <button className="btn btn-primary btn-block" type="submit" disabled={!supabaseConfigured || working}>
+          <button
+            className={`btn btn-primary btn-block ${!canSubmit || working ? "is-disabled" : ""}`}
+            type="submit"
+            disabled={!canSubmit || working}
+          >
             {working ? "Creating account…" : "Create account"}
           </button>
 
