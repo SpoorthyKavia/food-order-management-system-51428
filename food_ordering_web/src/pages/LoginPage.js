@@ -47,7 +47,7 @@ export default function LoginPage() {
     try {
       await signIn({ email: email.trim(), password });
       // AuthContext session will update via onAuthStateChange; navigate immediately for UX.
-      navigate("/", { replace: true });
+      navigate("/menu", { replace: true });
     } catch (err) {
       // Supabase errors often include useful messages; normalize common ones.
       const msg = String(err?.message || "Login failed.");

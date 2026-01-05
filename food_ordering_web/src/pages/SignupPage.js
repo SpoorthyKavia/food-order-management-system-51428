@@ -10,7 +10,7 @@ function isValidEmail(v) {
 // PUBLIC_INTERFACE
 export default function SignupPage() {
   /** Signup page using Supabase email/password. */
-  const { signUp, supabaseConfigured, user } = useAuth();
+  const { signUp, supabaseConfigured, session } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
@@ -46,17 +46,19 @@ export default function SignupPage() {
 
     setWorking(true);
     try {
+      // AuthContext wraps supabase.auth.signUp(). Session may or may not be created depending on
+      // whether email confirmation is required.
       await signUp({ email: email.trim(), password });
 
-      // If email confirmation is disabled, Supabase may immediately create a session.
-      // AuthContext will update `user` asynchronously; we optimistically navigate if it already exists.
-      if (user) {
-        navigate("/", { replace: true });
+      // If email confirmation is disabled, Supabase typically creates a session immediately.
+      // Otherwise, session stays null and the user must confirm email.
+      if (session?.user) {
+        navigate("/menu", { replace: true });
         return;
       }
 
       setSuccess(
-        "Account created. If email confirmation is enabled, check your inbox for a confirmation link."
+        "Account created. If email confirmation is enabled, check your inbox for a confirmation link before signing in."
       );
     } catch (err) {
       setError(String(err?.message || "Signup failed."));
@@ -114,7 +116,11 @@ export default function SignupPage() {
             <div className="muted small">Use at least 6 characters.</div>
           </div>
 
-          {error ? <div className="errorBox" role="alert">{error}</div> : null}
+          {error ? (
+            <div className="errorBox" role="alert">
+              {error}
+            </div>
+          ) : null}
           {success ? <div className="successBox">{success}</div> : null}
 
           <button

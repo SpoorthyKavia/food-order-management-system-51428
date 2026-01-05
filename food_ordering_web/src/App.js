@@ -2,6 +2,7 @@ import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 
+import { RedirectIfAuthed } from "./components/AuthRouteGuards";
 import MenuPage from "./pages/MenuPage";
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
@@ -16,17 +17,32 @@ function App() {
   /** Application root (routes only). Providers are mounted in index.js. */
   return (
     <Routes>
-      <Route path="/" element={<MenuPage />} />
+      <Route path="/" element={<Navigate to="/menu" replace />} />
+      <Route path="/menu" element={<MenuPage />} />
       <Route path="/cart" element={<CartPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
 
       <Route path="/orders" element={<OrderStatusListPage />} />
       <Route path="/orders/:orderId" element={<OrderStatusDetailPage />} />
 
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
+      <Route
+        path="/login"
+        element={
+          <RedirectIfAuthed to="/menu">
+            <LoginPage />
+          </RedirectIfAuthed>
+        }
+      />
+      <Route
+        path="/signup"
+        element={
+          <RedirectIfAuthed to="/menu">
+            <SignupPage />
+          </RedirectIfAuthed>
+        }
+      />
 
-      <Route path="/home" element={<Navigate to="/" replace />} />
+      <Route path="/home" element={<Navigate to="/menu" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
